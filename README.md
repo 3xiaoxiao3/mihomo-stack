@@ -12,7 +12,7 @@ Mihomo Stack 是面向单节点的完整 Mihomo 容器部署栈。它集成 Miho
 - Vue 3 管理界面；
 - amd64、arm64、arm/v7 镜像；
 - secret 文件、非 root、只读 rootfs 和最小权限容器配置；
-- checksum 校验、CI 测试、SBOM、漏洞扫描和镜像签名流程。
+- 固定上游源码提交、checksum 校验、CI 测试、SBOM、漏洞扫描和镜像签名流程。
 
 > 请在遵守所在地法律、网络服务条款和订阅提供方规则的前提下使用。本项目不提供节点、
 > 订阅或规避访问控制的服务。
@@ -150,7 +150,7 @@ docker compose -f deploy/compose.yaml --profile converter up -d --build
 - 候选和状态文件使用 `0600`，通过同目录临时文件原子替换。
 - Cookie 写操作必须通过同源检查；CLI 可以使用 Bearer token。
 - Controller 端口只映射到宿主回环地址。
-- 镜像内上游二进制固定版本并校验 SHA-256。
+- Mihomo 从固定版本和 commit 的上游源码构建；其他上游制品固定版本并校验 SHA-256。
 
 威胁边界、漏洞报告方式见 [`SECURITY.md`](SECURITY.md)。不要把 secret、订阅 URL 或
 完整配置粘贴到公开 Issue。
@@ -177,5 +177,5 @@ npm run build
 ## 开源与第三方组件
 
 Mihomo Stack 自有代码使用 MIT License。发布镜像同时包含 GPL-3.0 的 Mihomo 和
-MetaCubeXD，它们保留各自许可证。固定版本、源码链接和 checksum 见
+MetaCubeXD，它们保留各自许可证。固定版本、源码链接、补丁说明和 checksum 见
 [`THIRD_PARTY.md`](THIRD_PARTY.md)。

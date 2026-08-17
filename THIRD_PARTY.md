@@ -8,16 +8,16 @@ their own licenses; the MIT license does not replace or weaken their terms.
 
 - Project: <https://github.com/MetaCubeX/mihomo>
 - Pinned release: `v1.19.30`
+- Pinned source commit: `ac017cdd246ce8bd547653d927e7bf77d7ee73d5`
 - License: GNU General Public License v3.0
 - Corresponding source: <https://github.com/MetaCubeX/mihomo/tree/v1.19.30>
 
-Release assets verified by `deploy/Dockerfile`:
-
-| Platform | SHA-256 |
-| --- | --- |
-| linux/amd64 baseline v1 | `cbe553d0319a414bd3a372c5976a252155b2c4882b66bce88a4d6bba9571a553` |
-| linux/arm64 | `58896873736d28628f66de3677c8654fa0f180662523148e136cff4f6e890069` |
-| linux/arm/v7 | `7b4e8793f9f8fa4a21ea66528890ebde5a73d557673fb94d3047eebb60ad7591` |
+`deploy/Dockerfile` verifies that the release tag resolves to the pinned commit,
+then builds Mihomo from source for each target platform with Go 1.26 and the
+upstream `with_gvisor` build tag. The container build updates
+`golang.org/x/crypto` from the release's `v0.33.0` to `v0.52.0` before compiling
+to incorporate upstream security fixes. The resulting binary reports version
+`v1.19.30-stack.1`.
 
 ## MetaCubeXD
 

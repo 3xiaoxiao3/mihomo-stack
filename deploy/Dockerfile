@@ -2,6 +2,7 @@
 
 ARG ALPINE_VERSION=3.21
 ARG GO_VERSION=1.24
+ARG MIHOMO_GO_VERSION=1.26
 ARG NODE_VERSION=22
 
 FROM node:${NODE_VERSION}-alpine AS web-build
@@ -25,24 +26,35 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     -ldflags="-s -w -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=${BUILD_DATE}" \
     -o /out/mihomo-guardian ./cmd/mihomo-guardian
 
-FROM alpine:${ALPINE_VERSION} AS mihomo-download
+FROM --platform=$BUILDPLATFORM golang:${MIHOMO_GO_VERSION}-alpine AS mihomo-build
 ARG TARGETARCH
 ARG TARGETVARIANT
 ARG MIHOMO_VERSION=v1.19.30
-ARG MIHOMO_SHA_AMD64=cbe553d0319a414bd3a372c5976a252155b2c4882b66bce88a4d6bba9571a553
-ARG MIHOMO_SHA_ARM64=58896873736d28628f66de3677c8654fa0f180662523148e136cff4f6e890069
-ARG MIHOMO_SHA_ARMV7=7b4e8793f9f8fa4a21ea66528890ebde5a73d557673fb94d3047eebb60ad7591
-RUN apk add --no-cache ca-certificates wget \
+ARG MIHOMO_COMMIT=ac017cdd246ce8bd547653d927e7bf77d7ee73d5
+ARG MIHOMO_X_CRYPTO_VERSION=v0.52.0
+ARG MIHOMO_BUILD_VERSION=v1.19.30-stack.1
+ARG MIHOMO_BUILD_TIME=2026-08-17T00:00:00Z
+RUN apk add --no-cache ca-certificates git \
+    && git clone --branch "${MIHOMO_VERSION}" --depth 1 \
+      https://github.com/MetaCubeX/mihomo.git /src/mihomo \
+    && test "$(git -C /src/mihomo rev-parse HEAD)" = "${MIHOMO_COMMIT}"
+WORKDIR /src/mihomo
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go get "golang.org/x/crypto@${MIHOMO_X_CRYPTO_VERSION}" \
+    && go mod tidy \
+    && test "$(go list -m -f '{{.Version}}' golang.org/x/crypto)" = "${MIHOMO_X_CRYPTO_VERSION}"
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    cp -f /etc/ssl/certs/ca-certificates.crt component/ca/ca-certificates.crt \
     && case "${TARGETARCH}/${TARGETVARIANT}" in \
-         amd64/) asset="mihomo-linux-amd64-v1-${MIHOMO_VERSION}.gz"; sha="${MIHOMO_SHA_AMD64}" ;; \
-         arm64/) asset="mihomo-linux-arm64-${MIHOMO_VERSION}.gz"; sha="${MIHOMO_SHA_ARM64}" ;; \
-         arm/v7) asset="mihomo-linux-armv7-${MIHOMO_VERSION}.gz"; sha="${MIHOMO_SHA_ARMV7}" ;; \
+         amd64/) export GOARCH=amd64 GOAMD64=v1 ;; \
+         arm64/) export GOARCH=arm64 ;; \
+         arm/v7) export GOARCH=arm GOARM=7 ;; \
          *) echo "unsupported platform ${TARGETARCH}/${TARGETVARIANT}" >&2; exit 1 ;; \
        esac \
-    && wget -q -O /tmp/mihomo.gz "https://github.com/MetaCubeX/mihomo/releases/download/${MIHOMO_VERSION}/${asset}" \
-    && echo "${sha}  /tmp/mihomo.gz" | sha256sum -c - \
-    && gzip -d /tmp/mihomo.gz \
-    && install -m 0755 /tmp/mihomo /usr/local/bin/mihomo
+    && CGO_ENABLED=0 GOOS=linux go build -tags with_gvisor -trimpath \
+      -ldflags="-s -w -buildid= -X github.com/metacubex/mihomo/constant.Version=${MIHOMO_BUILD_VERSION} -X github.com/metacubex/mihomo/constant.BuildTime=${MIHOMO_BUILD_TIME}" \
+      -o /out/mihomo
 
 FROM alpine:${ALPINE_VERSION} AS dashboard-download
 ARG METACUBEXD_VERSION=v1.273.0
@@ -96,7 +108,7 @@ RUN apk add --no-cache ca-certificates su-exec tzdata \
     && mkdir -p /app/web /app/dashboard /data \
     && chown -R guardian:guardian /app /data
 COPY --from=go-build /out/mihomo-guardian /usr/local/bin/mihomo-guardian
-COPY --from=mihomo-download /usr/local/bin/mihomo /usr/local/bin/mihomo
+COPY --from=mihomo-build /out/mihomo /usr/local/bin/mihomo
 COPY --from=web-build /src/web/dist/ /app/web/
 COPY --from=dashboard-download /out/dashboard/ /app/dashboard/
 COPY --from=license-download /GPL-3.0.txt /usr/share/licenses/GPL-3.0.txt
@@ -124,7 +136,7 @@ RUN apk add --no-cache ca-certificates su-exec tzdata \
     && adduser -S -D -H -u 10001 -G guardian guardian \
     && mkdir -p /app/dashboard /data \
     && chown -R guardian:guardian /app /data
-COPY --from=mihomo-download /usr/local/bin/mihomo /usr/local/bin/mihomo
+COPY --from=mihomo-build /out/mihomo /usr/local/bin/mihomo
 COPY --from=dashboard-download /out/dashboard/ /app/dashboard/
 COPY --from=license-download /GPL-3.0.txt /usr/share/licenses/GPL-3.0.txt
 COPY THIRD_PARTY.md /usr/share/doc/mihomo-stack/THIRD_PARTY.md
