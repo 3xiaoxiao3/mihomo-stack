@@ -1,0 +1,16 @@
+/bin/
+/coverage/
+/data/
+/secrets/*.txt
+/web/dist/
+/web/node_modules/
+*.tsbuildinfo
+*.log
+.DS_Store
+
+# Local coding-agent guidance and implementation specifications.
+/AGENT.md
+/AGENTS.md
+/**/AGENT.md
+/**/AGENTS.md
+/docs/specs/

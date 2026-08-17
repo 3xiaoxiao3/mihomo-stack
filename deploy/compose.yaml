@@ -1,0 +1,92 @@
+name: mihomo-stack
+
+services:
+  mihomo:
+    image: ghcr.io/3xiaoxiao3/mihomo-stack-mihomo:${GUARDIAN_VERSION:-latest}
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: mihomo-runtime
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+    secrets:
+      - mihomo_controller_secret
+    volumes:
+      - guardian-data:/data
+    ports:
+      - "${PROXY_BIND_ADDRESS:-0.0.0.0}:${PROXY_PORT:-7890}:7890"
+      - "127.0.0.1:${CONTROLLER_PORT:-9090}:9090"
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1700
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - SETGID
+      - SETUID
+    security_opt:
+      - no-new-privileges:true
+
+  guardian:
+    image: ghcr.io/3xiaoxiao3/mihomo-stack:${GUARDIAN_VERSION:-latest}
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: guardian
+    restart: unless-stopped
+    depends_on:
+      mihomo:
+        condition: service_healthy
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      GUARDIAN_LOG_LEVEL: ${GUARDIAN_LOG_LEVEL:-info}
+    secrets:
+      - guardian_admin_token
+      - mihomo_controller_secret
+      - primary_subscription_url
+    volumes:
+      - guardian-data:/data
+    ports:
+      - "${GUARDIAN_BIND_ADDRESS:-0.0.0.0}:${GUARDIAN_PORT:-8080}:8080"
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1700
+      - /run/guardian-secrets:size=1m,mode=0700
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - SETGID
+      - SETUID
+    security_opt:
+      - no-new-privileges:true
+
+  subconverter:
+    profiles: ["converter"]
+    image: ghcr.io/3xiaoxiao3/mihomo-stack-subconverter:${GUARDIAN_VERSION:-latest}
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: subconverter-runtime
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  guardian-data:
+
+secrets:
+  guardian_admin_token:
+    file: ../secrets/guardian_admin_token.txt
+  mihomo_controller_secret:
+    file: ../secrets/mihomo_controller_secret.txt
+  primary_subscription_url:
+    file: ../secrets/primary_subscription_url.txt

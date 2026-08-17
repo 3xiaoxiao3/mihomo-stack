@@ -1,0 +1,47 @@
+server:
+  listen: 0.0.0.0:8080
+  web_dir: /app/web
+  read_timeout: 10s
+  write_timeout: 2m
+
+auth:
+  admin_token_file: /run/guardian-secrets/guardian_admin_token
+
+storage:
+  data_dir: /data
+  active_config: /data/config.yaml
+  backup_retention: 10
+  history_retention: 100
+
+mihomo:
+  binary: /usr/local/bin/mihomo
+  api_url: http://mihomo:9090
+  secret_file: /run/guardian-secrets/mihomo_controller_secret
+  enforce_runtime_settings: true
+  controller_listen: 0.0.0.0:9090
+  external_ui: /app/dashboard
+  mixed_port: 7890
+  allow_lan: true
+  validation_timeout: 30s
+  request_timeout: 10s
+
+update:
+  enabled: true
+  run_on_start: true
+  interval: 6h
+  health_delay: 2s
+
+subscription:
+  max_bytes: 16777216
+  request_timeout: 30s
+  user_agent: mihomo-guardian/1
+  sources:
+    - name: primary
+      url_file: /run/guardian-secrets/primary_subscription_url
+
+converter:
+  enabled: false
+  api_url: http://subconverter:25500
+
+ui:
+  dashboard_url: http://localhost:9090/ui

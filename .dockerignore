@@ -1,0 +1,11 @@
+.git
+.github
+bin
+coverage
+data
+secrets
+web/dist
+web/node_modules
+*.log
+*.md
+!THIRD_PARTY.md
