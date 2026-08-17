@@ -62,10 +62,32 @@ jobs:
           push: false
           tags: mihomo-stack:ci
           load: true
-      - uses: aquasecurity/trivy-action@v0.36.0
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: mihomo-stack:ci
-          format: table
-          exit-code: "1"
+          format: json
+          output: trivy-results.json
+          exit-code: "0"
           ignore-unfixed: true
           severity: CRITICAL,HIGH
+      - name: Enforce vulnerability policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          count="$(jq '[.Results[]?.Vulnerabilities[]?] | length' trivy-results.json)"
+          if [ "$count" -eq 0 ]; then
+            echo "No fixed HIGH or CRITICAL vulnerabilities found."
+            exit 0
+          fi
+
+          echo "### Trivy found ${count} fixed HIGH/CRITICAL vulnerabilities" >> "$GITHUB_STEP_SUMMARY"
+          jq -r '
+            [.Results[]? as $result | $result.Vulnerabilities[]? |
+              [$result.Target, .VulnerabilityID, .PkgName, .InstalledVersion, .FixedVersion, .Severity]
+            ][0:50][] | @tsv
+          ' trivy-results.json | while IFS=$'\t' read -r target vulnerability package installed fixed severity; do
+            printf '::error title=Trivy %s %s::Package %s %s in %s; fixed in %s\n' \
+              "$severity" "$vulnerability" "$package" "$installed" "$target" "$fixed"
+          done
+          exit 1
