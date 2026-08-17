@@ -72,12 +72,6 @@ RUN apk add --no-cache ca-certificates wget \
     && mkdir -p /out/dashboard \
     && tar -xzf /tmp/dashboard.tgz -C /out/dashboard
 
-FROM alpine:${ALPINE_VERSION} AS license-download
-ARG GPL3_SHA256=3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986
-RUN apk add --no-cache ca-certificates wget \
-    && wget -q -O /GPL-3.0.txt https://www.gnu.org/licenses/gpl-3.0.txt \
-    && echo "${GPL3_SHA256}  /GPL-3.0.txt" | sha256sum -c -
-
 FROM alpine:${ALPINE_VERSION} AS subconverter-download
 ARG TARGETARCH
 ARG TARGETVARIANT
@@ -118,7 +112,7 @@ COPY --from=go-build /out/mihomo-guardian /usr/local/bin/mihomo-guardian
 COPY --from=mihomo-build /out/mihomo /usr/local/bin/mihomo
 COPY --from=web-build /src/web/dist/ /app/web/
 COPY --from=dashboard-download /out/dashboard/ /app/dashboard/
-COPY --from=license-download /GPL-3.0.txt /usr/share/licenses/GPL-3.0.txt
+COPY licenses/GPL-3.0.txt /usr/share/licenses/GPL-3.0.txt
 COPY LICENSE THIRD_PARTY.md /usr/share/doc/mihomo-stack/
 COPY --chown=guardian:guardian config.example.yaml /app/config.yaml
 COPY --chmod=0755 deploy/guardian-entrypoint.sh /usr/local/bin/guardian-entrypoint.sh
@@ -145,7 +139,7 @@ RUN apk add --no-cache ca-certificates su-exec tzdata \
     && chown -R guardian:guardian /app /data
 COPY --from=mihomo-build /out/mihomo /usr/local/bin/mihomo
 COPY --from=dashboard-download /out/dashboard/ /app/dashboard/
-COPY --from=license-download /GPL-3.0.txt /usr/share/licenses/GPL-3.0.txt
+COPY licenses/GPL-3.0.txt /usr/share/licenses/GPL-3.0.txt
 COPY THIRD_PARTY.md /usr/share/doc/mihomo-stack/THIRD_PARTY.md
 COPY --chmod=0755 deploy/mihomo-entrypoint.sh deploy/mihomo-healthcheck.sh /usr/local/bin/
 EXPOSE 7890 9090
@@ -167,7 +161,7 @@ RUN apk add --no-cache ca-certificates tzdata \
     && addgroup -S -g 10002 converter \
     && adduser -S -D -H -u 10002 -G converter converter
 COPY --from=subconverter-download --chown=converter:converter /out/subconverter /app/subconverter
-COPY --from=license-download /GPL-3.0.txt /usr/share/licenses/GPL-3.0.txt
+COPY licenses/GPL-3.0.txt /usr/share/licenses/GPL-3.0.txt
 COPY THIRD_PARTY.md /usr/share/doc/mihomo-stack/THIRD_PARTY.md
 USER 10002:10002
 WORKDIR /app/subconverter

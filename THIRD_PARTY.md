@@ -3,6 +3,8 @@
 Mihomo Stack's source code is MIT licensed. Release container images also
 redistribute the following independent programs. Those programs remain under
 their own licenses; the MIT license does not replace or weaken their terms.
+A verbatim copy of the GPLv3 text included in release images is stored at
+`licenses/GPL-3.0.txt`.
 
 ## Mihomo
 
