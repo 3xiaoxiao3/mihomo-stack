@@ -1,47 +1,134 @@
+# Mihomo Stack / mihomo-guardian 配置示例。
+#
+# 通用规则：
+# - 配置只支持单个 YAML 文档，出现未知字段会直接启动失败，避免拼写错误被静默忽略。
+# - 时间使用 Go duration 格式，例如 500ms、30s、5m、6h；要求为正数的字段不能写 0。
+# - 相对路径均以本配置文件所在目录为基准；容器部署建议继续使用下面的绝对路径。
+# - token、Controller secret、订阅 URL 等敏感值不能直接写进 YAML，只能填写对应的 *_file 路径。
+# - secret 文件必须是普通文件，只包含一行非空文本，末尾可带换行，且大小不能超过 64 KiB。
+
+# Guardian HTTP 服务和内置管理页面。
 server:
+  # 监听地址，格式为 host:port。
+  # 0.0.0.0 允许从容器外访问，因此必须配置 auth.admin_token_file；
+  # 如仅在宿主机直接运行且无需远程访问，可改为 127.0.0.1:8080。
   listen: 0.0.0.0:8080
+  # Guardian 管理前端的静态文件目录。官方镜像已将前端构建产物放在此目录。
   web_dir: /app/web
+  # 读取 HTTP 请求（包含请求体）的最长时间，必须大于 0。
   read_timeout: 10s
+  # 写出 HTTP 响应的最长时间；手动更新可能耗时较长，因此默认设置为 2 分钟。
   write_timeout: 2m
 
+# Guardian 管理接口认证。
 auth:
+  # 管理员 token 文件。token 至少 16 个字符，用于网页登录和 Bearer Token API 认证。
+  # Compose 会把 guardian_admin_token secret 安全复制到下面的容器内路径。
   admin_token_file: /run/guardian-secrets/guardian_admin_token
+  # 危险选项：仅在明确接受未认证远程访问风险时启用。
+  # 监听非回环地址且未配置 admin_token_file 时，必须显式设为 true 才能启动。
+  # allow_unauthenticated_remote: false
 
+# Guardian 持久化数据。官方 Compose 将 /data 挂载为 guardian-data volume。
 storage:
+  # Guardian state.json、backups/ 和 Mihomo 运行数据的根路径。
   data_dir: /data
+  # 当前生效的 Mihomo 配置。Guardian 与 Mihomo 容器必须以完全相同的路径挂载它。
+  # 更新成功时 Guardian 会原子替换此文件；首次更新前允许文件不存在。
   active_config: /data/config.yaml
+  # 最多保留的历史配置备份数量，允许范围 1～1000，超出后删除最旧备份。
   backup_retention: 10
+  # state.json 中最多保留的更新/回滚操作记录数，允许范围 1～10000。
   history_retention: 100
 
+# Mihomo 校验命令、Controller 连接和强制写入候选配置的运行参数。
 mihomo:
+  # 用于执行 `mihomo -t` 的二进制。含路径分隔符的相对路径按配置文件目录解析；
+  # 只写命令名时从 PATH 查找。官方镜像使用下面的绝对路径。
   binary: /usr/local/bin/mihomo
+  # Guardian 访问 Mihomo Controller 的内部 HTTP(S) 地址，不是浏览器访问地址。
+  # 必须是完整 URL；使用 HTTPS 时始终校验证书，不提供 insecure 开关。
   api_url: http://mihomo:9090
+  # Mihomo Controller secret 文件，内容必须与 Mihomo 进程实际使用的 secret 一致。
+  # Controller 监听非回环地址时此项必填，值本身不要写入 YAML。
   secret_file: /run/guardian-secrets/mihomo_controller_secret
+  # 是否强制覆盖每次订阅候选配置中的 mixed-port、allow-lan、
+  # external-controller、external-ui 和 secret，防止订阅刷新破坏容器端口及控制链路。
+  # 关闭后需自行保证订阅配置中的这些字段始终正确且 Controller 可达。
   enforce_runtime_settings: true
+  # 写入候选配置的 external-controller，格式为 host:port。
+  # Guardian 与 Mihomo 分属不同容器，因此官方 Compose 使用 0.0.0.0:9090；
+  # 宿主机端口仍只绑定 127.0.0.1，不会因此直接公开 Controller。
   controller_listen: 0.0.0.0:9090
+  # 写入候选配置的 external-ui 路径，必须在 Mihomo 容器内存在。
   external_ui: /app/dashboard
+  # 写入候选配置的 mixed-port，供 HTTP/SOCKS 代理共用；允许范围 1～65535。
   mixed_port: 7890
+  # 写入候选配置的 allow-lan。设为 true 只表示 Mihomo 允许局域网连接，
+  # 实际可达范围还取决于 Compose 端口绑定、宿主防火墙和路由器配置。
   allow_lan: true
+  # 每次激活前运行 `mihomo -t` 校验候选配置的超时时间，必须大于 0。
   validation_timeout: 30s
+  # Controller reload、健康检查和版本查询的单次 HTTP 超时时间，必须大于 0。
   request_timeout: 10s
 
+# 自动订阅更新调度。手动 API/CLI 更新不受 enabled 影响。
 update:
+  # 是否启动后台定时更新；设为 false 后仍可在页面或 CLI 手动触发更新。
   enabled: true
+  # 启动调度器后是否立即更新一次。仅在 enabled: true 时生效。
   run_on_start: true
+  # 定时更新间隔；启用自动更新时必须大于 0。
   interval: 6h
+  # Controller reload 后等待多久再做健康检查，给 Mihomo 留出加载配置的时间；可设为 0。
+  # 健康检查失败会自动恢复旧配置并再次 reload。
   health_delay: 2s
 
+# 订阅下载和多订阅合并。
 subscription:
+  # 单个订阅响应（或转换后的响应）允许的最大字节数。
+  # 允许范围 1 KiB～128 MiB；16777216 字节等于 16 MiB。
   max_bytes: 16777216
+  # 单次订阅或 subconverter HTTP 请求超时时间，必须大于 0。
   request_timeout: 30s
+  # 下载订阅及调用 subconverter 时发送的 User-Agent。
   user_agent: mihomo-guardian/1
+  # 至少需要一个启用的订阅；所有启用项的 name 必须非空且唯一。
+  # 多个 Clash/Mihomo YAML 会按列表顺序确定性合并，重名但内容冲突时整次更新失败。
   sources:
+    # name 只用于日志、错误定位和去重，不会发送给订阅服务。
     - name: primary
+      # 文件内容必须是一行完整的 HTTP(S) 订阅 URL，不能把真实 URL 直接写在此处。
+      # 新增 secret 时还需同步更新 deploy/compose.yaml 的 secrets/guardian 挂载，
+      # 以及 deploy/guardian-entrypoint.sh 中复制到 /run/guardian-secrets 的名称列表。
       url_file: /run/guardian-secrets/primary_subscription_url
+      # 省略 enabled 等价于 true；可临时设为 false，但最终必须至少保留一个启用项。
+      # enabled: true
+      # 可选非敏感自定义请求头，值会以明文保存在 YAML，勿填写 Authorization/Cookie 等凭据。
+      # Host 和 Content-Length 被禁止；跨主机重定向时，
+      # 除 User-Agent/Accept 外的头会被移除，避免 Authorization 等敏感信息泄漏。
+      # converter.enabled: true 时不支持任何自定义 headers。
+      # headers:
+      #   X-Client-Name: mihomo-stack
 
+    # 第二个订阅示例：取消注释后还要创建并挂载对应 secret 文件。
+    # - name: secondary
+    #   url_file: /run/guardian-secrets/secondary_subscription_url
+    #   enabled: true
+
+# 可选订阅格式转换。原始订阅已经是 Clash/Mihomo YAML 时保持关闭。
 converter:
+  # 启用后会把全部启用订阅 URL 交给 subconverter 的 /sub 接口，并请求 target=clash。
+  # 这意味着 converter 能看到真实订阅 URL，只应使用自己控制的可信服务。
   enabled: false
+  # 容器内 subconverter 地址。官方 Compose 需同时使用 `--profile converter` 启动服务。
   api_url: http://subconverter:25500
+  # 默认只允许回环、私网 IP 或类似 Docker service name 的内部地址。
+  # 如确需使用公网 converter，必须显式设为 true，并自行承担订阅 URL 泄露风险。
+  # allow_remote: false
 
+# 管理页面展示的外部链接，不由 Guardian 后端请求。
 ui:
+  # 用户浏览器打开 MetaCubeXD 的地址。localhost 指运行浏览器的设备，
+  # 因此远程访问 Guardian 时应改为浏览器可达的宿主机域名或 IP 与 Controller 端口。
   dashboard_url: http://localhost:9090/ui
