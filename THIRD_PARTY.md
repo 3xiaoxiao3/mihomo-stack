@@ -15,9 +15,9 @@ their own licenses; the MIT license does not replace or weaken their terms.
 `deploy/Dockerfile` verifies that the release tag resolves to the pinned commit,
 then builds Mihomo from source for each target platform with Go 1.26 and the
 upstream `with_gvisor` build tag. The container build updates
-`golang.org/x/crypto` from the release's `v0.33.0` to `v0.52.0` before compiling
-to incorporate upstream security fixes. The resulting binary reports version
-`v1.19.30-stack.1`.
+`golang.org/x/crypto` to `v0.53.0`, `golang.org/x/net` to `v0.56.0`, and
+`golang.org/x/text` to `v0.39.0` before compiling to incorporate upstream
+security fixes. The resulting binary reports version `v1.19.30-stack.2`.
 
 ## MetaCubeXD
 

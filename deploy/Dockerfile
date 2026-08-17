@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 ARG ALPINE_VERSION=3.21
-ARG GO_VERSION=1.24
+ARG GO_VERSION=1.26
 ARG MIHOMO_GO_VERSION=1.26
 ARG NODE_VERSION=22
 
@@ -31,8 +31,10 @@ ARG TARGETARCH
 ARG TARGETVARIANT
 ARG MIHOMO_VERSION=v1.19.30
 ARG MIHOMO_COMMIT=ac017cdd246ce8bd547653d927e7bf77d7ee73d5
-ARG MIHOMO_X_CRYPTO_VERSION=v0.52.0
-ARG MIHOMO_BUILD_VERSION=v1.19.30-stack.1
+ARG MIHOMO_X_CRYPTO_VERSION=v0.53.0
+ARG MIHOMO_X_NET_VERSION=v0.56.0
+ARG MIHOMO_X_TEXT_VERSION=v0.39.0
+ARG MIHOMO_BUILD_VERSION=v1.19.30-stack.2
 ARG MIHOMO_BUILD_TIME=2026-08-17T00:00:00Z
 RUN apk add --no-cache ca-certificates git \
     && git clone --branch "${MIHOMO_VERSION}" --depth 1 \
@@ -40,9 +42,14 @@ RUN apk add --no-cache ca-certificates git \
     && test "$(git -C /src/mihomo rev-parse HEAD)" = "${MIHOMO_COMMIT}"
 WORKDIR /src/mihomo
 RUN --mount=type=cache,target=/go/pkg/mod \
-    go get "golang.org/x/crypto@${MIHOMO_X_CRYPTO_VERSION}" \
+    go get \
+      "golang.org/x/crypto@${MIHOMO_X_CRYPTO_VERSION}" \
+      "golang.org/x/net@${MIHOMO_X_NET_VERSION}" \
+      "golang.org/x/text@${MIHOMO_X_TEXT_VERSION}" \
     && go mod tidy \
-    && test "$(go list -m -f '{{.Version}}' golang.org/x/crypto)" = "${MIHOMO_X_CRYPTO_VERSION}"
+    && test "$(go list -m -f '{{.Version}}' golang.org/x/crypto)" = "${MIHOMO_X_CRYPTO_VERSION}" \
+    && test "$(go list -m -f '{{.Version}}' golang.org/x/net)" = "${MIHOMO_X_NET_VERSION}" \
+    && test "$(go list -m -f '{{.Version}}' golang.org/x/text)" = "${MIHOMO_X_TEXT_VERSION}"
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     cp -f /etc/ssl/certs/ca-certificates.crt component/ca/ca-certificates.crt \
